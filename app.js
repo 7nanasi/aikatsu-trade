@@ -5,7 +5,6 @@
   var STORAGE_KEY = "aikatsu-trade-selections-v1";
   var STORAGE_KEY_OWNED = "aikatsu-trade-owned-v1";
   var RARITIES = ["PR", "ER", "R", "N"];
-  var RARITY_RANK = RARITIES.reduce(function (acc, r, i) { acc[r] = i; return acc; }, {});
   var MAX_QTY = 99;
   var MAX_OWNED = 99;
 
@@ -81,10 +80,6 @@
   // ---- カードデータの並び順・弾一覧 ----
 
   function buildDisplayOrder(cards) {
-    var seriesOrder = getAvailableSeries(cards);
-    var seriesRank = new Map(seriesOrder.map(function (s, i) { return [s, i]; }));
-    var originalIndex = new Map(cards.map(function (c, i) { return [c.id, i]; }));
-
     var parallelsByBase = new Map();
     var base = [];
 
@@ -97,17 +92,6 @@
       } else {
         base.push(c);
       }
-    });
-
-    // 同じ弾内ではレアリティ順（PR→ER→R→N）に束ねる。弾順・レアリティ順が同じ場合は元の並び順を維持する。
-    base.sort(function (a, b) {
-      var sa = seriesRank.has(a.series) ? seriesRank.get(a.series) : seriesOrder.length;
-      var sb = seriesRank.has(b.series) ? seriesRank.get(b.series) : seriesOrder.length;
-      if (sa !== sb) return sa - sb;
-      var ra = RARITY_RANK.hasOwnProperty(a.rarity) ? RARITY_RANK[a.rarity] : RARITIES.length;
-      var rb = RARITY_RANK.hasOwnProperty(b.rarity) ? RARITY_RANK[b.rarity] : RARITIES.length;
-      if (ra !== rb) return ra - rb;
-      return originalIndex.get(a.id) - originalIndex.get(b.id);
     });
 
     var ordered = [];
