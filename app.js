@@ -14,6 +14,7 @@
     { value: 2, label: "2" },
     { value: 3, label: "3+" }
   ];
+  var STATUS_LABELS = { want: "求", yield: "譲", pending: "予定" };
 
   var CARD_BY_ID = new Map(CARDS.map(function (c) { return [c.id, c]; }));
   var DISPLAY_ORDER = buildDisplayOrder(CARDS);
@@ -293,8 +294,17 @@
     yieldBtn.setAttribute("aria-label", card.name + "（" + card.rarity + "）を譲にする");
     yieldBtn.textContent = "譲";
 
+    var pendingBtn = document.createElement("button");
+    pendingBtn.type = "button";
+    pendingBtn.className = "status-btn status-btn-pending";
+    pendingBtn.dataset.action = "pending";
+    pendingBtn.setAttribute("aria-pressed", "false");
+    pendingBtn.setAttribute("aria-label", card.name + "（" + card.rarity + "）を交換予定にする");
+    pendingBtn.textContent = "予定";
+
     statusRow.appendChild(wantBtn);
     statusRow.appendChild(yieldBtn);
+    statusRow.appendChild(pendingBtn);
 
     var stepper = document.createElement("div");
     stepper.className = "qty-stepper";
@@ -360,24 +370,26 @@
     var cell = els.cardGrid.querySelector('.card-cell[data-id="' + CSS.escape(id) + '"]');
     if (!cell) return;
     var sel = selections[id];
+    var status = sel ? sel.status : null;
     var badge = cell.querySelector(".status-badge");
     var qtyPill = cell.querySelector(".qty-pill");
     var stepper = cell.querySelector(".qty-stepper");
     var qtyValue = cell.querySelector(".qty-value");
     var wantBtn = cell.querySelector(".status-btn-want");
     var yieldBtn = cell.querySelector(".status-btn-yield");
-    var isWant = !!sel && sel.status === "want";
-    var isYield = !!sel && sel.status === "yield";
+    var pendingBtn = cell.querySelector(".status-btn-pending");
 
-    cell.classList.remove("is-want", "is-yield");
-    wantBtn.classList.toggle("is-active", isWant);
-    wantBtn.setAttribute("aria-pressed", String(isWant));
-    yieldBtn.classList.toggle("is-active", isYield);
-    yieldBtn.setAttribute("aria-pressed", String(isYield));
+    cell.classList.remove("is-want", "is-yield", "is-pending");
+    wantBtn.classList.toggle("is-active", status === "want");
+    wantBtn.setAttribute("aria-pressed", String(status === "want"));
+    yieldBtn.classList.toggle("is-active", status === "yield");
+    yieldBtn.setAttribute("aria-pressed", String(status === "yield"));
+    pendingBtn.classList.toggle("is-active", status === "pending");
+    pendingBtn.setAttribute("aria-pressed", String(status === "pending"));
 
     if (sel) {
-      cell.classList.add(isWant ? "is-want" : "is-yield");
-      badge.textContent = isWant ? "求" : "譲";
+      cell.classList.add("is-" + status);
+      badge.textContent = STATUS_LABELS[status];
       badge.hidden = false;
       stepper.hidden = false;
       qtyValue.textContent = String(sel.qty);
@@ -424,8 +436,9 @@
   function renderSummary() {
     var want = 0, yield_ = 0;
     Object.keys(selections).forEach(function (id) {
-      if (selections[id].status === "want") want++;
-      else yield_++;
+      var status = selections[id].status;
+      if (status === "want") want++;
+      else if (status === "yield") yield_++;
     });
     els.summaryWant.textContent = String(want);
     els.summaryYield.textContent = String(yield_);
@@ -532,7 +545,7 @@
     Object.keys(selections).forEach(function (id) {
       var sel = selections[id];
       if (sel.status === "want") wantEntries.push([id, sel]);
-      else yieldEntries.push([id, sel]);
+      else if (sel.status === "yield") yieldEntries.push([id, sel]);
     });
 
     if (wantEntries.length === 0 && yieldEntries.length === 0) {

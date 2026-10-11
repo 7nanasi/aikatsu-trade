@@ -14,6 +14,9 @@
   --status-yield: #0d9488;
   --status-yield-bg: rgba(13, 148, 136, 0.14);
 
+  --status-pending: #d97706;
+  --status-pending-bg: rgba(217, 119, 6, 0.14);
+
   --glass-bg: rgba(255, 255, 255, 0.55);
   --glass-bg-hi: rgba(255, 255, 255, 0.72);
   --glass-bg-lo: rgba(255, 255, 255, 0.4);
@@ -371,6 +374,11 @@ body {
   border-color: rgba(13, 148, 136, 0.4);
 }
 
+.card-cell.is-pending {
+  background: var(--status-pending-bg);
+  border-color: rgba(217, 119, 6, 0.4);
+}
+
 .card-image-wrap {
   position: relative;
   background: var(--glass-bg-lo);
@@ -404,6 +412,10 @@ body {
   background: var(--status-yield);
 }
 
+.card-cell.is-pending .status-badge {
+  background: var(--status-pending);
+}
+
 .qty-pill {
   position: absolute;
   top: 0.35rem;
@@ -431,18 +443,20 @@ body {
 
 .status-buttons {
   display: flex;
-  gap: 0.4rem;
+  gap: 0.3rem;
 }
 
 .status-btn {
   flex: 1 1 0;
+  min-width: 0;
   border: 1px solid var(--glass-border);
   background: var(--glass-bg-lo);
   color: var(--ink);
   border-radius: var(--radius-button);
   padding: 0.3rem 0;
-  font-size: 0.78rem;
+  font-size: 0.7rem;
   font-weight: 700;
+  white-space: nowrap;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -465,6 +479,12 @@ body {
 
 .status-btn-yield.is-active {
   background: var(--status-yield);
+  color: #fff;
+  border-color: transparent;
+}
+
+.status-btn-pending.is-active {
+  background: var(--status-pending);
   color: #fff;
   border-color: transparent;
 }
