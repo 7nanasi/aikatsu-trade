@@ -16,10 +16,15 @@
 
   <header class="app-header">
     <h1>アイカツ！アンコール<br>カード交換画像メーカー</h1>
-    <p class="app-sub">カードの「求」「譲」ボタンで振り分け、交換用のPNG画像を作成します。</p>
+    <p class="app-sub">「所持管理」「交換」の2モードでカードを整理し、交換用のPNG画像を作成します。</p>
   </header>
 
   <main class="app-main">
+    <section id="modeSwitch" class="mode-switch glass-card" role="group" aria-label="モード切替">
+      <button type="button" class="mode-btn" data-mode="own" aria-pressed="false">所持管理</button>
+      <button type="button" class="mode-btn is-active" data-mode="trade" aria-pressed="true">交換</button>
+    </section>
+
     <section class="toolbar glass-card" aria-label="検索とフィルタ">
       <div class="search-row">
         <input id="searchInput" type="search" placeholder="カードID・名前で検索（例: E1-01 / PR）" aria-label="カード検索">
@@ -51,14 +56,7 @@
 
       <div class="filter-block">
         <span class="filter-label">管理状態</span>
-        <div id="manageChips" class="chip-row" role="group" aria-label="管理状態フィルタ">
-          <button type="button" class="chip-btn" data-manage="all" aria-pressed="true">すべて</button>
-          <button type="button" class="chip-btn" data-manage="owned" aria-pressed="false">所持</button>
-          <button type="button" class="chip-btn" data-manage="unowned" aria-pressed="false">未所持</button>
-          <button type="button" class="chip-btn" data-manage="want" aria-pressed="false">求</button>
-          <button type="button" class="chip-btn" data-manage="yield" aria-pressed="false">譲</button>
-          <button type="button" class="chip-btn" data-manage="pending" aria-pressed="false">交換予定</button>
-        </div>
+        <div id="manageChips" class="chip-row" role="group" aria-label="管理状態フィルタ"></div>
       </div>
 
       <div class="toolbar-meta">

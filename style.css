@@ -15,7 +15,6 @@
   --status-yield-bg: rgba(13, 148, 136, 0.14);
 
   --status-pending: #d97706;
-  --status-pending-bg: rgba(217, 119, 6, 0.14);
 
   --glass-bg: rgba(255, 255, 255, 0.55);
   --glass-bg-hi: rgba(255, 255, 255, 0.72);
@@ -123,6 +122,41 @@ body {
   .glass-card {
     background: rgba(255, 255, 255, 0.85);
   }
+}
+
+.mode-switch {
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.6rem;
+}
+
+.mode-btn {
+  flex: 1 1 0;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-lo);
+  color: var(--ink);
+  border-radius: var(--radius-button);
+  padding: 0.7rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mode-btn:hover {
+  background: var(--glass-bg-hi);
+}
+
+.mode-btn.is-active {
+  background: linear-gradient(135deg, var(--accent-from), var(--accent-to));
+  color: #fff;
+  border-color: transparent;
+  box-shadow: var(--accent-glow);
+}
+
+.mode-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(236, 72, 153, 0.6), 0 0 0 4px rgba(255, 255, 255, 0.7);
 }
 
 .toolbar {
@@ -376,9 +410,16 @@ body {
   border-color: rgba(13, 148, 136, 0.4);
 }
 
-.card-cell.is-pending {
-  background: var(--status-pending-bg);
-  border-color: rgba(217, 119, 6, 0.4);
+.card-cell.is-want-pending {
+  background: rgba(236, 72, 153, 0.14);
+  border-color: rgba(217, 119, 6, 0.6);
+  border-style: dashed;
+}
+
+.card-cell.is-yield-pending {
+  background: var(--status-yield-bg);
+  border-color: rgba(217, 119, 6, 0.6);
+  border-style: dashed;
 }
 
 .card-image-wrap {
@@ -404,18 +445,28 @@ body {
   padding: 0.15rem 0.5rem;
   border-radius: 999px;
   color: #fff;
+  white-space: nowrap;
+  max-width: calc(100% - 0.7rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.card-cell.is-want .status-badge {
+.card-cell.is-want .status-badge,
+.card-cell.is-want-pending .status-badge {
   background: linear-gradient(135deg, var(--accent-from), var(--accent-to));
 }
 
-.card-cell.is-yield .status-badge {
+.card-cell.is-yield .status-badge,
+.card-cell.is-yield-pending .status-badge {
   background: var(--status-yield);
 }
 
-.card-cell.is-pending .status-badge {
-  background: var(--status-pending);
+.card-cell.is-want-pending .status-badge,
+.card-cell.is-yield-pending .status-badge {
+  font-size: 0.6rem;
+  padding: 0.15rem 0.4rem;
+  outline: 2px dashed rgba(217, 119, 6, 0.9);
+  outline-offset: 1px;
 }
 
 .qty-pill {
@@ -489,6 +540,23 @@ body {
   background: var(--status-pending);
   color: #fff;
   border-color: transparent;
+}
+
+.status-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.status-btn:disabled:hover {
+  background: var(--glass-bg-lo);
+}
+
+.owned-readout {
+  text-align: center;
+  font-size: 0.64rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--ink-muted);
 }
 
 .qty-stepper {

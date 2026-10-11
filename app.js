@@ -14,21 +14,40 @@
     { value: 2, label: "2" },
     { value: 3, label: "3+" }
   ];
-  var STATUS_LABELS = { want: "求", yield: "譲", pending: "予定" };
+
+  var MODES = { OWN: "own", TRADE: "trade" };
+
+  var MANAGE_CHIPS = {
+    trade: [
+      { value: "all", label: "すべて" },
+      { value: "want", label: "求" },
+      { value: "yield", label: "譲" },
+      { value: "want_pending", label: "もらう予定" },
+      { value: "yield_pending", label: "あげる予定" }
+    ],
+    own: [
+      { value: "all", label: "すべて" },
+      { value: "owned", label: "所持" },
+      { value: "unowned", label: "未所持" }
+    ]
+  };
 
   var CARD_BY_ID = new Map(CARDS.map(function (c) { return [c.id, c]; }));
   var DISPLAY_ORDER = buildDisplayOrder(CARDS);
   var DISPLAY_INDEX = new Map(DISPLAY_ORDER.map(function (c, i) { return [c.id, i]; }));
   var AVAILABLE_SERIES = getAvailableSeries(CARDS);
 
+  var mode = MODES.TRADE;
   var selections = loadSelections();
+  saveSelections(); // 旧status:pendingを無印に戻した移行結果を保存しておく
   var owned = loadOwned();
   var filters = {
     series: "all",
     rarities: new Set(RARITIES),
     showParallel: false,
     query: "",
-    manage: "all"
+    ownManage: "all",
+    tradeManage: "all"
   };
 
   var els = {};
@@ -39,6 +58,7 @@
   document.addEventListener("DOMContentLoaded", init);
 
   function init() {
+    els.modeSwitch = document.getElementById("modeSwitch");
     els.searchInput = document.getElementById("searchInput");
     els.seriesTabs = document.getElementById("seriesTabs");
     els.rarityChips = document.getElementById("rarityChips");
@@ -57,6 +77,7 @@
     els.toast = document.getElementById("toast");
 
     renderSeriesTabs();
+    renderManageChips();
     renderGrid();
     renderSummary();
     checkHtml2canvasAvailability();
@@ -129,7 +150,22 @@
       var raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return {};
       var parsed = JSON.parse(raw);
-      return (parsed && typeof parsed === "object") ? parsed : {};
+      if (!parsed || typeof parsed !== "object") return {};
+      // 旧データ構造では status:"pending" が求/譲と独立した第3状態だったが、
+      // 方向（もらう/あげる）を記録していないため推測できない。無印に戻す。
+      var migrated = {};
+      Object.keys(parsed).forEach(function (id) {
+        var sel = parsed[id];
+        if (!sel || typeof sel !== "object") return;
+        if (sel.status === "want" || sel.status === "yield") {
+          migrated[id] = {
+            status: sel.status,
+            qty: typeof sel.qty === "number" ? sel.qty : 1,
+            pending: !!sel.pending
+          };
+        }
+      });
+      return migrated;
     } catch (e) {
       console.warn("[aikatsu-trade] 選択状態の読み込みに失敗しました", e);
       return {};
@@ -216,9 +252,53 @@
     });
   }
 
+  function getManageFilterValue() {
+    return mode === MODES.TRADE ? filters.tradeManage : filters.ownManage;
+  }
+
+  function setManageFilterValue(value) {
+    if (mode === MODES.TRADE) filters.tradeManage = value;
+    else filters.ownManage = value;
+  }
+
+  function renderManageChips() {
+    var current = getManageFilterValue();
+    els.manageChips.innerHTML = "";
+    MANAGE_CHIPS[mode].forEach(function (opt) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "chip-btn";
+      btn.dataset.manage = opt.value;
+      btn.textContent = opt.label;
+      var active = current === opt.value;
+      btn.setAttribute("aria-pressed", String(active));
+      if (active) btn.classList.add("is-active");
+      els.manageChips.appendChild(btn);
+    });
+  }
+
   function syncManageChips() {
+    var current = getManageFilterValue();
     Array.prototype.forEach.call(els.manageChips.querySelectorAll(".chip-btn"), function (btn) {
-      var active = btn.dataset.manage === filters.manage;
+      var active = btn.dataset.manage === current;
+      btn.setAttribute("aria-pressed", String(active));
+      btn.classList.toggle("is-active", active);
+    });
+  }
+
+  // ---- モード切替（所持管理 / 交換） ----
+
+  function setMode(newMode) {
+    if (mode === newMode) return;
+    mode = newMode;
+    syncModeButtons();
+    renderManageChips();
+    renderGrid();
+  }
+
+  function syncModeButtons() {
+    Array.prototype.forEach.call(els.modeSwitch.querySelectorAll(".mode-btn"), function (btn) {
+      var active = btn.dataset.mode === mode;
       btn.setAttribute("aria-pressed", String(active));
       btn.classList.toggle("is-active", active);
     });
@@ -233,14 +313,22 @@
       if (filters.series !== "all" && c.series !== filters.series) return false;
       if (!filters.rarities.has(c.rarity)) return false;
       if (q && c.id.toLowerCase().indexOf(q) === -1 && c.name.toLowerCase().indexOf(q) === -1) return false;
-      if (filters.manage !== "all") {
-        var status = selections[c.id] ? selections[c.id].status : null;
-        var ownedVal = getOwned(c.id);
-        if (filters.manage === "owned" && ownedVal === 0) return false;
-        if (filters.manage === "unowned" && ownedVal !== 0) return false;
-        if (filters.manage === "want" && status !== "want") return false;
-        if (filters.manage === "yield" && status !== "yield") return false;
-        if (filters.manage === "pending" && status !== "pending") return false;
+
+      var manageVal = getManageFilterValue();
+      if (manageVal !== "all") {
+        if (mode === MODES.OWN) {
+          var ownedVal = getOwned(c.id);
+          if (manageVal === "owned" && ownedVal === 0) return false;
+          if (manageVal === "unowned" && ownedVal !== 0) return false;
+        } else {
+          var sel = selections[c.id];
+          var status = sel ? sel.status : null;
+          var pending = sel ? !!sel.pending : false;
+          if (manageVal === "want" && !(status === "want" && !pending)) return false;
+          if (manageVal === "yield" && !(status === "yield" && !pending)) return false;
+          if (manageVal === "want_pending" && !(status === "want" && pending)) return false;
+          if (manageVal === "yield_pending" && !(status === "yield" && pending)) return false;
+        }
       }
       return true;
     });
@@ -260,6 +348,21 @@
     els.resultCount.textContent = String(filtered.length);
   }
 
+  function getStatusBadgeInfo(sel) {
+    if (sel.status === "want") {
+      return sel.pending ? { text: "もらう予定", cls: "is-want-pending" } : { text: "求", cls: "is-want" };
+    }
+    return sel.pending ? { text: "あげる予定", cls: "is-yield-pending" } : { text: "譲", cls: "is-yield" };
+  }
+
+  function formatOwnedLabel(value) {
+    var found = null;
+    OWNED_OPTIONS.forEach(function (opt) {
+      if (opt.value === value) found = opt.label;
+    });
+    return found !== null ? found : String(value);
+  }
+
   function buildCardCell(card) {
     var cell = document.createElement("div");
     cell.className = "card-cell";
@@ -273,18 +376,7 @@
     img.alt = card.name;
     img.loading = "lazy";
     img.crossOrigin = "anonymous";
-
-    var badge = document.createElement("span");
-    badge.className = "status-badge";
-    badge.hidden = true;
-
-    var qtyPill = document.createElement("span");
-    qtyPill.className = "qty-pill";
-    qtyPill.hidden = true;
-
     imgWrap.appendChild(img);
-    imgWrap.appendChild(badge);
-    imgWrap.appendChild(qtyPill);
 
     var label = document.createElement("div");
     label.className = "card-label";
@@ -296,94 +388,112 @@
     }
     label.appendChild(document.createTextNode(card.id));
 
-    var statusRow = document.createElement("div");
-    statusRow.className = "status-buttons";
-
-    var wantBtn = document.createElement("button");
-    wantBtn.type = "button";
-    wantBtn.className = "status-btn status-btn-want";
-    wantBtn.dataset.action = "want";
-    wantBtn.setAttribute("aria-pressed", "false");
-    wantBtn.setAttribute("aria-label", card.name + "（" + card.rarity + "）を求にする");
-    wantBtn.textContent = "求";
-
-    var yieldBtn = document.createElement("button");
-    yieldBtn.type = "button";
-    yieldBtn.className = "status-btn status-btn-yield";
-    yieldBtn.dataset.action = "yield";
-    yieldBtn.setAttribute("aria-pressed", "false");
-    yieldBtn.setAttribute("aria-label", card.name + "（" + card.rarity + "）を譲にする");
-    yieldBtn.textContent = "譲";
-
-    var pendingBtn = document.createElement("button");
-    pendingBtn.type = "button";
-    pendingBtn.className = "status-btn status-btn-pending";
-    pendingBtn.dataset.action = "pending";
-    pendingBtn.setAttribute("aria-pressed", "false");
-    pendingBtn.setAttribute("aria-label", card.name + "（" + card.rarity + "）を交換予定にする");
-    pendingBtn.textContent = "予定";
-
-    statusRow.appendChild(wantBtn);
-    statusRow.appendChild(yieldBtn);
-    statusRow.appendChild(pendingBtn);
-
-    var stepper = document.createElement("div");
-    stepper.className = "qty-stepper";
-    stepper.hidden = true;
-
-    var dec = document.createElement("button");
-    dec.type = "button";
-    dec.className = "qty-btn";
-    dec.dataset.action = "dec";
-    dec.setAttribute("aria-label", "枚数を減らす");
-    dec.textContent = "−";
-
-    var qtyValue = document.createElement("span");
-    qtyValue.className = "qty-value";
-    qtyValue.textContent = "1";
-
-    var inc = document.createElement("button");
-    inc.type = "button";
-    inc.className = "qty-btn";
-    inc.dataset.action = "inc";
-    inc.setAttribute("aria-label", "枚数を増やす");
-    inc.textContent = "+";
-
-    stepper.appendChild(dec);
-    stepper.appendChild(qtyValue);
-    stepper.appendChild(inc);
-
-    var ownedRow = document.createElement("div");
-    ownedRow.className = "owned-row";
-
-    var ownedLabel = document.createElement("span");
-    ownedLabel.className = "owned-label";
-    ownedLabel.textContent = "所持";
-
-    var ownedButtons = document.createElement("div");
-    ownedButtons.className = "owned-buttons";
-    ownedButtons.setAttribute("role", "group");
-    ownedButtons.setAttribute("aria-label", card.name + "（" + card.rarity + "）の所持枚数");
-
-    OWNED_OPTIONS.forEach(function (opt) {
-      var ownedBtn = document.createElement("button");
-      ownedBtn.type = "button";
-      ownedBtn.className = "owned-btn";
-      ownedBtn.dataset.owned = String(opt.value);
-      ownedBtn.setAttribute("aria-pressed", "false");
-      ownedBtn.setAttribute("aria-label", "所持枚数を" + opt.label + "にする");
-      ownedBtn.textContent = opt.label;
-      ownedButtons.appendChild(ownedBtn);
-    });
-
-    ownedRow.appendChild(ownedLabel);
-    ownedRow.appendChild(ownedButtons);
-
     cell.appendChild(imgWrap);
     cell.appendChild(label);
-    cell.appendChild(statusRow);
-    cell.appendChild(stepper);
-    cell.appendChild(ownedRow);
+
+    if (mode === MODES.TRADE) {
+      var badge = document.createElement("span");
+      badge.className = "status-badge";
+      badge.hidden = true;
+      imgWrap.appendChild(badge);
+
+      var qtyPill = document.createElement("span");
+      qtyPill.className = "qty-pill";
+      qtyPill.hidden = true;
+      imgWrap.appendChild(qtyPill);
+
+      var ownedReadout = document.createElement("div");
+      ownedReadout.className = "owned-readout";
+      cell.appendChild(ownedReadout);
+
+      var statusRow = document.createElement("div");
+      statusRow.className = "status-buttons";
+
+      var wantBtn = document.createElement("button");
+      wantBtn.type = "button";
+      wantBtn.className = "status-btn status-btn-want";
+      wantBtn.dataset.action = "want";
+      wantBtn.setAttribute("aria-pressed", "false");
+      wantBtn.setAttribute("aria-label", card.name + "（" + card.rarity + "）を求にする");
+      wantBtn.textContent = "求";
+
+      var yieldBtn = document.createElement("button");
+      yieldBtn.type = "button";
+      yieldBtn.className = "status-btn status-btn-yield";
+      yieldBtn.dataset.action = "yield";
+      yieldBtn.setAttribute("aria-pressed", "false");
+      yieldBtn.setAttribute("aria-label", card.name + "（" + card.rarity + "）を譲にする");
+      yieldBtn.textContent = "譲";
+
+      var pendingBtn = document.createElement("button");
+      pendingBtn.type = "button";
+      pendingBtn.className = "status-btn status-btn-pending";
+      pendingBtn.dataset.action = "pending";
+      pendingBtn.disabled = true;
+      pendingBtn.setAttribute("aria-pressed", "false");
+      pendingBtn.setAttribute("aria-label", card.name + "（" + card.rarity + "）を交換予定にする（求・譲のいずれかを選ぶと有効になります）");
+      pendingBtn.textContent = "予定";
+
+      statusRow.appendChild(wantBtn);
+      statusRow.appendChild(yieldBtn);
+      statusRow.appendChild(pendingBtn);
+      cell.appendChild(statusRow);
+
+      var stepper = document.createElement("div");
+      stepper.className = "qty-stepper";
+      stepper.hidden = true;
+
+      var dec = document.createElement("button");
+      dec.type = "button";
+      dec.className = "qty-btn";
+      dec.dataset.action = "dec";
+      dec.setAttribute("aria-label", "枚数を減らす");
+      dec.textContent = "−";
+
+      var qtyValue = document.createElement("span");
+      qtyValue.className = "qty-value";
+      qtyValue.textContent = "1";
+
+      var inc = document.createElement("button");
+      inc.type = "button";
+      inc.className = "qty-btn";
+      inc.dataset.action = "inc";
+      inc.setAttribute("aria-label", "枚数を増やす");
+      inc.textContent = "+";
+
+      stepper.appendChild(dec);
+      stepper.appendChild(qtyValue);
+      stepper.appendChild(inc);
+      cell.appendChild(stepper);
+    } else {
+      var ownedRow = document.createElement("div");
+      ownedRow.className = "owned-row";
+
+      var ownedLabel = document.createElement("span");
+      ownedLabel.className = "owned-label";
+      ownedLabel.textContent = "所持";
+
+      var ownedButtons = document.createElement("div");
+      ownedButtons.className = "owned-buttons";
+      ownedButtons.setAttribute("role", "group");
+      ownedButtons.setAttribute("aria-label", card.name + "（" + card.rarity + "）の所持枚数");
+
+      OWNED_OPTIONS.forEach(function (opt) {
+        var ownedBtn = document.createElement("button");
+        ownedBtn.type = "button";
+        ownedBtn.className = "owned-btn";
+        ownedBtn.dataset.owned = String(opt.value);
+        ownedBtn.setAttribute("aria-pressed", "false");
+        ownedBtn.setAttribute("aria-label", "所持枚数を" + opt.label + "にする");
+        ownedBtn.textContent = opt.label;
+        ownedButtons.appendChild(ownedBtn);
+      });
+
+      ownedRow.appendChild(ownedLabel);
+      ownedRow.appendChild(ownedButtons);
+      cell.appendChild(ownedRow);
+    }
+
     return cell;
   }
 
@@ -391,44 +501,54 @@
     var cell = els.cardGrid.querySelector('.card-cell[data-id="' + CSS.escape(id) + '"]');
     if (!cell) return;
     var sel = selections[id];
-    var status = sel ? sel.status : null;
-    var badge = cell.querySelector(".status-badge");
-    var qtyPill = cell.querySelector(".qty-pill");
-    var stepper = cell.querySelector(".qty-stepper");
-    var qtyValue = cell.querySelector(".qty-value");
-    var wantBtn = cell.querySelector(".status-btn-want");
-    var yieldBtn = cell.querySelector(".status-btn-yield");
-    var pendingBtn = cell.querySelector(".status-btn-pending");
+    var ownedVal = getOwned(id);
 
-    cell.classList.remove("is-want", "is-yield", "is-pending");
-    wantBtn.classList.toggle("is-active", status === "want");
-    wantBtn.setAttribute("aria-pressed", String(status === "want"));
-    yieldBtn.classList.toggle("is-active", status === "yield");
-    yieldBtn.setAttribute("aria-pressed", String(status === "yield"));
-    pendingBtn.classList.toggle("is-active", status === "pending");
-    pendingBtn.setAttribute("aria-pressed", String(status === "pending"));
+    if (mode === MODES.TRADE) {
+      var badge = cell.querySelector(".status-badge");
+      var qtyPill = cell.querySelector(".qty-pill");
+      var stepper = cell.querySelector(".qty-stepper");
+      var qtyValue = cell.querySelector(".qty-value");
+      var wantBtn = cell.querySelector(".status-btn-want");
+      var yieldBtn = cell.querySelector(".status-btn-yield");
+      var pendingBtn = cell.querySelector(".status-btn-pending");
+      var ownedReadout = cell.querySelector(".owned-readout");
 
-    if (sel) {
-      cell.classList.add("is-" + status);
-      badge.textContent = STATUS_LABELS[status];
-      badge.hidden = false;
-      stepper.hidden = false;
-      qtyValue.textContent = String(sel.qty);
-      qtyPill.hidden = sel.qty <= 1;
-      qtyPill.textContent = "×" + sel.qty;
+      cell.classList.remove("is-want", "is-yield", "is-want-pending", "is-yield-pending");
+      wantBtn.classList.toggle("is-active", !!sel && sel.status === "want");
+      wantBtn.setAttribute("aria-pressed", String(!!sel && sel.status === "want"));
+      yieldBtn.classList.toggle("is-active", !!sel && sel.status === "yield");
+      yieldBtn.setAttribute("aria-pressed", String(!!sel && sel.status === "yield"));
+
+      var pendingActive = !!sel && !!sel.pending;
+      pendingBtn.classList.toggle("is-active", pendingActive);
+      pendingBtn.setAttribute("aria-pressed", String(pendingActive));
+      pendingBtn.disabled = !sel;
+
+      if (sel) {
+        var info = getStatusBadgeInfo(sel);
+        cell.classList.add(info.cls);
+        badge.textContent = info.text;
+        badge.hidden = false;
+        stepper.hidden = false;
+        qtyValue.textContent = String(sel.qty);
+        qtyPill.hidden = sel.qty <= 1;
+        qtyPill.textContent = "×" + sel.qty;
+      } else {
+        badge.hidden = true;
+        stepper.hidden = true;
+        qtyPill.hidden = true;
+      }
+
+      ownedReadout.textContent = "所持" + formatOwnedLabel(ownedVal);
     } else {
-      badge.hidden = true;
-      stepper.hidden = true;
-      qtyPill.hidden = true;
+      var ownedBtns = cell.querySelectorAll(".owned-btn");
+      Array.prototype.forEach.call(ownedBtns, function (btn) {
+        var active = Number(btn.dataset.owned) === ownedVal;
+        btn.classList.toggle("is-active", active);
+        btn.setAttribute("aria-pressed", String(active));
+      });
     }
 
-    var ownedVal = getOwned(id);
-    var ownedBtns = cell.querySelectorAll(".owned-btn");
-    Array.prototype.forEach.call(ownedBtns, function (btn) {
-      var active = Number(btn.dataset.owned) === ownedVal;
-      btn.classList.toggle("is-active", active);
-      btn.setAttribute("aria-pressed", String(active));
-    });
     cell.classList.toggle("is-unowned", ownedVal === 0);
   }
 
@@ -439,8 +559,18 @@
     if (cur && cur.status === status) {
       delete selections[id];
     } else {
-      selections[id] = { status: status, qty: cur ? cur.qty : 1 };
+      // 求/譲の切替は新しい交換方向の宣言なので、以前の交換予定フラグは引き継がない
+      selections[id] = { status: status, qty: cur ? cur.qty : 1, pending: false };
     }
+    saveSelections();
+    updateCardCellUI(id);
+    renderSummary();
+  }
+
+  function togglePending(id) {
+    var cur = selections[id];
+    if (!cur) return;
+    cur.pending = !cur.pending;
     saveSelections();
     updateCardCellUI(id);
     renderSummary();
@@ -457,10 +587,10 @@
   function renderSummary() {
     var want = 0, yield_ = 0, pending = 0;
     Object.keys(selections).forEach(function (id) {
-      var status = selections[id].status;
-      if (status === "want") want++;
-      else if (status === "yield") yield_++;
-      else if (status === "pending") pending++;
+      var sel = selections[id];
+      if (sel.status === "want") want++;
+      else if (sel.status === "yield") yield_++;
+      if (sel.pending) pending++;
     });
     var ownedCount = 0;
     Object.keys(owned).forEach(function (id) {
@@ -475,6 +605,12 @@
   // ---- イベント ----
 
   function bindEvents() {
+    els.modeSwitch.addEventListener("click", function (e) {
+      var btn = e.target.closest(".mode-btn");
+      if (!btn) return;
+      setMode(btn.dataset.mode);
+    });
+
     els.searchInput.addEventListener("input", function () {
       filters.query = els.searchInput.value.trim().toLowerCase();
       renderGrid();
@@ -506,7 +642,7 @@
     els.manageChips.addEventListener("click", function (e) {
       var manageBtn = e.target.closest(".chip-btn");
       if (!manageBtn) return;
-      filters.manage = manageBtn.dataset.manage;
+      setManageFilterValue(manageBtn.dataset.manage);
       syncManageChips();
       renderGrid();
     });
@@ -530,7 +666,9 @@
       }
       var statusBtn = e.target.closest(".status-btn");
       if (statusBtn) {
-        toggleStatus(statusBtn.closest(".card-cell").dataset.id, statusBtn.dataset.action);
+        var id = statusBtn.closest(".card-cell").dataset.id;
+        if (statusBtn.dataset.action === "pending") togglePending(id);
+        else toggleStatus(id, statusBtn.dataset.action);
       }
     });
 
@@ -580,6 +718,7 @@
     var yieldEntries = [];
     Object.keys(selections).forEach(function (id) {
       var sel = selections[id];
+      if (sel.pending) return; // 交換成立済み（もらう予定／あげる予定）は画像に含めない
       if (sel.status === "want") wantEntries.push([id, sel]);
       else if (sel.status === "yield") yieldEntries.push([id, sel]);
     });
