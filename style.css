@@ -594,18 +594,24 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.35rem;
-}
-
-.owned-label {
-  font-size: 0.64rem;
-  font-weight: 600;
-  color: var(--ink-muted);
-  flex: 0 0 auto;
 }
 
 .owned-stepper {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.owned-stepper .qty-btn {
+  width: 2.4rem;
+  height: 2.4rem;
+  font-size: 1.4rem;
+}
+
+.owned-stepper .qty-value {
+  font-size: 1.15rem;
+  min-width: 2rem;
 }
 
 .card-cell.is-unowned .card-image-wrap {

@@ -453,10 +453,6 @@
       var ownedRow = document.createElement("div");
       ownedRow.className = "owned-row";
 
-      var ownedLabel = document.createElement("span");
-      ownedLabel.className = "owned-label";
-      ownedLabel.textContent = "所持";
-
       var ownedStepper = document.createElement("div");
       ownedStepper.className = "qty-stepper owned-stepper";
       ownedStepper.setAttribute("role", "group");
@@ -484,7 +480,6 @@
       ownedStepper.appendChild(ownedValue);
       ownedStepper.appendChild(ownedInc);
 
-      ownedRow.appendChild(ownedLabel);
       ownedRow.appendChild(ownedStepper);
       cell.appendChild(ownedRow);
     }
@@ -981,8 +976,9 @@
     return Promise.all(tasks);
   }
 
-  // 未所持カードは html2canvas が CSS filter:grayscale を無視するため、
-  // canvas 側（ctx.filter は有効）で事前にグレースケール化した dataURL を使う。
+  // 未所持カードは html2canvas が CSS filter:grayscale を無視するため、事前に
+  // グレースケール化した dataURL を使う。ctx.filter は Safari 17 未満など未対応の
+  // 環境があるので、ピクセル単位の輝度変換（全ブラウザで動く）でグレー化する。
   function toGrayscaleDataUrl(url) {
     return new Promise(function (resolve) {
       var im = new Image();
@@ -993,8 +989,14 @@
           cv.width = im.naturalWidth;
           cv.height = im.naturalHeight;
           var ctx = cv.getContext("2d");
-          ctx.filter = "grayscale(1)";
           ctx.drawImage(im, 0, 0);
+          var imageData = ctx.getImageData(0, 0, cv.width, cv.height);
+          var px = imageData.data;
+          for (var i = 0; i < px.length; i += 4) {
+            var g = (px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114) | 0;
+            px[i] = px[i + 1] = px[i + 2] = g;
+          }
+          ctx.putImageData(imageData, 0, 0);
           resolve(cv.toDataURL("image/png"));
         } catch (e) {
           resolve(url);
