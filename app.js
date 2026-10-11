@@ -7,13 +7,7 @@
   var RARITIES = ["PR", "ER", "R", "N"];
   var RARITY_RANK = RARITIES.reduce(function (acc, r, i) { acc[r] = i; return acc; }, {});
   var MAX_QTY = 99;
-  var MAX_OWNED = 3;
-  var OWNED_OPTIONS = [
-    { value: 0, label: "0" },
-    { value: 1, label: "1" },
-    { value: 2, label: "2" },
-    { value: 3, label: "3+" }
-  ];
+  var MAX_OWNED = 99;
 
   var MODES = { OWN: "own", TRADE: "trade" };
 
@@ -356,11 +350,7 @@
   }
 
   function formatOwnedLabel(value) {
-    var found = null;
-    OWNED_OPTIONS.forEach(function (opt) {
-      if (opt.value === value) found = opt.label;
-    });
-    return found !== null ? found : String(value);
+    return String(value);
   }
 
   function buildCardCell(card) {
@@ -473,24 +463,35 @@
       ownedLabel.className = "owned-label";
       ownedLabel.textContent = "所持";
 
-      var ownedButtons = document.createElement("div");
-      ownedButtons.className = "owned-buttons";
-      ownedButtons.setAttribute("role", "group");
-      ownedButtons.setAttribute("aria-label", card.name + "（" + card.rarity + "）の所持枚数");
+      var ownedStepper = document.createElement("div");
+      ownedStepper.className = "qty-stepper owned-stepper";
+      ownedStepper.setAttribute("role", "group");
+      ownedStepper.setAttribute("aria-label", card.name + "（" + card.rarity + "）の所持枚数");
 
-      OWNED_OPTIONS.forEach(function (opt) {
-        var ownedBtn = document.createElement("button");
-        ownedBtn.type = "button";
-        ownedBtn.className = "owned-btn";
-        ownedBtn.dataset.owned = String(opt.value);
-        ownedBtn.setAttribute("aria-pressed", "false");
-        ownedBtn.setAttribute("aria-label", "所持枚数を" + opt.label + "にする");
-        ownedBtn.textContent = opt.label;
-        ownedButtons.appendChild(ownedBtn);
-      });
+      var ownedDec = document.createElement("button");
+      ownedDec.type = "button";
+      ownedDec.className = "qty-btn";
+      ownedDec.dataset.action = "owned-dec";
+      ownedDec.setAttribute("aria-label", "所持枚数を減らす");
+      ownedDec.textContent = "−";
+
+      var ownedValue = document.createElement("span");
+      ownedValue.className = "qty-value owned-value";
+      ownedValue.textContent = "0";
+
+      var ownedInc = document.createElement("button");
+      ownedInc.type = "button";
+      ownedInc.className = "qty-btn";
+      ownedInc.dataset.action = "owned-inc";
+      ownedInc.setAttribute("aria-label", "所持枚数を増やす");
+      ownedInc.textContent = "+";
+
+      ownedStepper.appendChild(ownedDec);
+      ownedStepper.appendChild(ownedValue);
+      ownedStepper.appendChild(ownedInc);
 
       ownedRow.appendChild(ownedLabel);
-      ownedRow.appendChild(ownedButtons);
+      ownedRow.appendChild(ownedStepper);
       cell.appendChild(ownedRow);
     }
 
@@ -541,12 +542,8 @@
 
       ownedReadout.textContent = "所持" + formatOwnedLabel(ownedVal);
     } else {
-      var ownedBtns = cell.querySelectorAll(".owned-btn");
-      Array.prototype.forEach.call(ownedBtns, function (btn) {
-        var active = Number(btn.dataset.owned) === ownedVal;
-        btn.classList.toggle("is-active", active);
-        btn.setAttribute("aria-pressed", String(active));
-      });
+      var ownedValueEl = cell.querySelector(".owned-value");
+      if (ownedValueEl) ownedValueEl.textContent = String(ownedVal);
     }
 
     cell.classList.toggle("is-unowned", ownedVal === 0);
@@ -582,6 +579,11 @@
     cur.qty = Math.min(MAX_QTY, Math.max(1, cur.qty + delta));
     saveSelections();
     updateCardCellUI(id);
+  }
+
+  function changeOwned(id, delta) {
+    setOwned(id, getOwned(id) + delta);
+    renderSummary();
   }
 
   function renderSummary() {
@@ -656,12 +658,10 @@
       var qtyBtn = e.target.closest(".qty-btn");
       if (qtyBtn) {
         var cell = qtyBtn.closest(".card-cell");
-        changeQty(cell.dataset.id, qtyBtn.dataset.action === "inc" ? 1 : -1);
-        return;
-      }
-      var ownedBtn = e.target.closest(".owned-btn");
-      if (ownedBtn) {
-        setOwned(ownedBtn.closest(".card-cell").dataset.id, Number(ownedBtn.dataset.owned));
+        var act = qtyBtn.dataset.action;
+        if (act === "owned-inc") changeOwned(cell.dataset.id, 1);
+        else if (act === "owned-dec") changeOwned(cell.dataset.id, -1);
+        else changeQty(cell.dataset.id, act === "inc" ? 1 : -1);
         return;
       }
       var statusBtn = e.target.closest(".status-btn");
