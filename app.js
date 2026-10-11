@@ -65,6 +65,7 @@
     els.summaryOwned = document.getElementById("summaryOwned");
     els.clearBtn = document.getElementById("clearBtn");
     els.generateBtn = document.getElementById("generateBtn");
+    els.ownImageBtn = document.getElementById("ownImageBtn");
     els.html2canvasWarning = document.getElementById("html2canvasWarning");
     els.exportStage = document.getElementById("exportStage");
     els.toast = document.getElementById("toast");
@@ -74,7 +75,15 @@
     renderGrid();
     renderSummary();
     checkHtml2canvasAvailability();
+    updateActionButtons();
     bindEvents();
+  }
+
+  function updateActionButtons() {
+    var own = mode === MODES.OWN;
+    els.ownImageBtn.hidden = !own;
+    els.generateBtn.hidden = own;
+    els.clearBtn.hidden = own;
   }
 
   // ---- カードデータの並び順・弾一覧 ----
@@ -270,6 +279,7 @@
     if (mode === newMode) return;
     mode = newMode;
     syncModeButtons();
+    updateActionButtons();
     renderManageChips();
     renderGrid();
   }
@@ -658,6 +668,7 @@
 
     els.clearBtn.addEventListener("click", onClearClick);
     els.generateBtn.addEventListener("click", onGenerateClick);
+    els.ownImageBtn.addEventListener("click", onOwnImageClick);
   }
 
   function onClearClick() {
@@ -689,6 +700,7 @@
     if (typeof html2canvas !== "function") {
       els.html2canvasWarning.hidden = false;
       els.generateBtn.disabled = true;
+      els.ownImageBtn.disabled = true;
     }
   }
 
@@ -732,7 +744,7 @@
       })
       .then(function (canvas) {
         var dataUrl = canvas.toDataURL("image/png");
-        downloadDataUrl(dataUrl, buildFileName());
+        downloadDataUrl(dataUrl, buildFileName("aikatsu-trade"));
         showToast("交換画像を作成しました");
       })
       .catch(function (err) {
@@ -850,11 +862,147 @@
     a.remove();
   }
 
-  function buildFileName() {
+  function buildFileName(prefix) {
     var d = new Date();
     var pad = function (n) { return String(n).padStart(2, "0"); };
-    return "aikatsu-trade_" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) +
+    return (prefix || "aikatsu-trade") + "_" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) +
       "_" + pad(d.getHours()) + pad(d.getMinutes()) + ".png";
+  }
+
+  // ---- 所持画像の生成 ----
+
+  function seriesLabel(series) {
+    if (series === "all") return "全弾";
+    if (series === "promo") return "プロモーション";
+    return series + "弾";
+  }
+
+  function onOwnImageClick() {
+    if (typeof html2canvas !== "function") {
+      showToast("画像生成にはネット接続が必要です（html2canvasの読み込みに失敗しました）");
+      return;
+    }
+
+    var series = filters.series;
+    var cards = DISPLAY_ORDER.filter(function (c) {
+      if (c.parallel) return false;
+      if (series !== "all" && c.series !== series) return false;
+      return true;
+    });
+    if (cards.length === 0) {
+      showToast("対象のカードがありません");
+      return;
+    }
+
+    els.ownImageBtn.disabled = true;
+    var originalLabel = els.ownImageBtn.textContent;
+    els.ownImageBtn.textContent = "生成中…";
+
+    buildOwnSheet(cards, series)
+      .then(function () { return waitForStageImages(); })
+      .then(function () {
+        var target = els.exportStage.querySelector(".own-sheet");
+        return html2canvas(target, {
+          useCORS: true,
+          backgroundColor: "#ffffff",
+          scale: 2
+        });
+      })
+      .then(function (canvas) {
+        downloadDataUrl(canvas.toDataURL("image/png"), buildFileName("aikatsu-owned"));
+        showToast("所持画像を作成しました");
+      })
+      .catch(function (err) {
+        console.error("[aikatsu-trade] 所持画像の生成に失敗しました", err);
+        showToast("画像生成に失敗しました: " + err.message);
+      })
+      .then(function () {
+        els.ownImageBtn.disabled = false;
+        els.ownImageBtn.textContent = originalLabel;
+        els.exportStage.innerHTML = "";
+      });
+  }
+
+  function buildOwnSheet(cards, series) {
+    els.exportStage.innerHTML = "";
+
+    var sheet = document.createElement("div");
+    sheet.className = "own-sheet";
+
+    var ownedCount = cards.filter(function (c) { return getOwned(c.id) > 0; }).length;
+    var total = cards.length;
+    var pct = total ? (ownedCount / total * 100).toFixed(1) : "0.0";
+
+    var header = document.createElement("div");
+    header.className = "own-sheet-header";
+    var title = document.createElement("div");
+    title.className = "own-sheet-title";
+    title.textContent = "🎀 アイカツ！アンコール カード所持状況 🎀";
+    var sub = document.createElement("div");
+    sub.className = "own-sheet-sub";
+    sub.textContent = seriesLabel(series) + "　PR / R / N / ER　　所持：" + ownedCount + " / " + total + "枚（" + pct + "%）";
+    header.appendChild(title);
+    header.appendChild(sub);
+    sheet.appendChild(header);
+
+    var grid = document.createElement("div");
+    grid.className = "own-sheet-grid";
+    var tasks = [];
+    cards.forEach(function (c) {
+      var tile = document.createElement("div");
+      tile.className = "own-tile";
+
+      var img = document.createElement("img");
+      img.crossOrigin = "anonymous";
+      img.alt = c.name;
+      var url = IMAGE_BASE + c.image;
+      var n = getOwned(c.id);
+
+      if (n > 0) {
+        img.src = url;
+      } else {
+        tile.classList.add("is-unowned");
+        tasks.push(toGrayscaleDataUrl(url).then(function (dataUrl) { img.src = dataUrl; }));
+      }
+      tile.appendChild(img);
+
+      if (n > 0) {
+        var badge = document.createElement("span");
+        badge.className = "own-tile-count";
+        badge.textContent = String(n);
+        tile.appendChild(badge);
+      }
+
+      grid.appendChild(tile);
+    });
+    sheet.appendChild(grid);
+    els.exportStage.appendChild(sheet);
+
+    return Promise.all(tasks);
+  }
+
+  // 未所持カードは html2canvas が CSS filter:grayscale を無視するため、
+  // canvas 側（ctx.filter は有効）で事前にグレースケール化した dataURL を使う。
+  function toGrayscaleDataUrl(url) {
+    return new Promise(function (resolve) {
+      var im = new Image();
+      im.crossOrigin = "anonymous";
+      im.onload = function () {
+        try {
+          var cv = document.createElement("canvas");
+          cv.width = im.naturalWidth;
+          cv.height = im.naturalHeight;
+          var ctx = cv.getContext("2d");
+          ctx.filter = "grayscale(1)";
+          ctx.drawImage(im, 0, 0);
+          resolve(cv.toDataURL("image/png"));
+        } catch (e) {
+          resolve(url);
+        }
+      };
+      im.onerror = function () { resolve(url); };
+      im.src = url;
+    });
   }
 
   // ---- トースト通知 ----
