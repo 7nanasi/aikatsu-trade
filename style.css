@@ -293,6 +293,8 @@ body {
 
 .summary-want { color: var(--accent-from); }
 .summary-yield { color: var(--status-yield); }
+.summary-pending { color: var(--status-pending); }
+.summary-owned { color: var(--ink-muted); }
 
 .selection-actions {
   display: flex;

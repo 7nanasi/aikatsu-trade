@@ -49,6 +49,18 @@
         </label>
       </div>
 
+      <div class="filter-block">
+        <span class="filter-label">管理状態</span>
+        <div id="manageChips" class="chip-row" role="group" aria-label="管理状態フィルタ">
+          <button type="button" class="chip-btn" data-manage="all" aria-pressed="true">すべて</button>
+          <button type="button" class="chip-btn" data-manage="owned" aria-pressed="false">所持</button>
+          <button type="button" class="chip-btn" data-manage="unowned" aria-pressed="false">未所持</button>
+          <button type="button" class="chip-btn" data-manage="want" aria-pressed="false">求</button>
+          <button type="button" class="chip-btn" data-manage="yield" aria-pressed="false">譲</button>
+          <button type="button" class="chip-btn" data-manage="pending" aria-pressed="false">交換予定</button>
+        </div>
+      </div>
+
       <div class="toolbar-meta">
         <span id="resultCount">0</span> 件表示中
       </div>
@@ -58,6 +70,8 @@
       <div class="selection-summary">
         <span class="summary-pill summary-want">求 <strong id="summaryWant">0</strong>種</span>
         <span class="summary-pill summary-yield">譲 <strong id="summaryYield">0</strong>種</span>
+        <span class="summary-pill summary-pending">予定 <strong id="summaryPending">0</strong>種</span>
+        <span class="summary-pill summary-owned">所持 <strong id="summaryOwned">0</strong>種</span>
       </div>
       <div class="selection-actions">
         <button id="clearBtn" type="button" class="btn btn-ghost">選択をすべてクリア</button>

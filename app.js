@@ -27,7 +27,8 @@
     series: "all",
     rarities: new Set(RARITIES),
     showParallel: false,
-    query: ""
+    query: "",
+    manage: "all"
   };
 
   var els = {};
@@ -41,11 +42,14 @@
     els.searchInput = document.getElementById("searchInput");
     els.seriesTabs = document.getElementById("seriesTabs");
     els.rarityChips = document.getElementById("rarityChips");
+    els.manageChips = document.getElementById("manageChips");
     els.parallelToggle = document.getElementById("parallelToggle");
     els.resultCount = document.getElementById("resultCount");
     els.cardGrid = document.getElementById("cardGrid");
     els.summaryWant = document.getElementById("summaryWant");
     els.summaryYield = document.getElementById("summaryYield");
+    els.summaryPending = document.getElementById("summaryPending");
+    els.summaryOwned = document.getElementById("summaryOwned");
     els.clearBtn = document.getElementById("clearBtn");
     els.generateBtn = document.getElementById("generateBtn");
     els.html2canvasWarning = document.getElementById("html2canvasWarning");
@@ -212,6 +216,14 @@
     });
   }
 
+  function syncManageChips() {
+    Array.prototype.forEach.call(els.manageChips.querySelectorAll(".chip-btn"), function (btn) {
+      var active = btn.dataset.manage === filters.manage;
+      btn.setAttribute("aria-pressed", String(active));
+      btn.classList.toggle("is-active", active);
+    });
+  }
+
   // ---- 絞り込み ----
 
   function getFilteredCards() {
@@ -221,6 +233,15 @@
       if (filters.series !== "all" && c.series !== filters.series) return false;
       if (!filters.rarities.has(c.rarity)) return false;
       if (q && c.id.toLowerCase().indexOf(q) === -1 && c.name.toLowerCase().indexOf(q) === -1) return false;
+      if (filters.manage !== "all") {
+        var status = selections[c.id] ? selections[c.id].status : null;
+        var ownedVal = getOwned(c.id);
+        if (filters.manage === "owned" && ownedVal === 0) return false;
+        if (filters.manage === "unowned" && ownedVal !== 0) return false;
+        if (filters.manage === "want" && status !== "want") return false;
+        if (filters.manage === "yield" && status !== "yield") return false;
+        if (filters.manage === "pending" && status !== "pending") return false;
+      }
       return true;
     });
   }
@@ -434,14 +455,21 @@
   }
 
   function renderSummary() {
-    var want = 0, yield_ = 0;
+    var want = 0, yield_ = 0, pending = 0;
     Object.keys(selections).forEach(function (id) {
       var status = selections[id].status;
       if (status === "want") want++;
       else if (status === "yield") yield_++;
+      else if (status === "pending") pending++;
+    });
+    var ownedCount = 0;
+    Object.keys(owned).forEach(function (id) {
+      if (owned[id] > 0) ownedCount++;
     });
     els.summaryWant.textContent = String(want);
     els.summaryYield.textContent = String(yield_);
+    els.summaryPending.textContent = String(pending);
+    els.summaryOwned.textContent = String(ownedCount);
   }
 
   // ---- イベント ----
@@ -472,6 +500,14 @@
         filters.rarities.add(val);
       }
       syncRarityChips();
+      renderGrid();
+    });
+
+    els.manageChips.addEventListener("click", function (e) {
+      var manageBtn = e.target.closest(".chip-btn");
+      if (!manageBtn) return;
+      filters.manage = manageBtn.dataset.manage;
+      syncManageChips();
       renderGrid();
     });
 
