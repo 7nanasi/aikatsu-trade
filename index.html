@@ -1,0 +1,90 @@
+<!-- tako:run: open index.html -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>アイカツ！アンコール カード交換画像メーカー</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="bg-stage" aria-hidden="true">
+    <span class="blob blob-a"></span>
+    <span class="blob blob-b"></span>
+    <span class="blob blob-c"></span>
+  </div>
+
+  <header class="app-header">
+    <h1>アイカツ！アンコール<br>カード交換画像メーカー</h1>
+    <p class="app-sub">カードの「求」「譲」ボタンで振り分け、交換用のPNG画像を作成します。</p>
+  </header>
+
+  <main class="app-main">
+    <section class="toolbar glass-card" aria-label="検索とフィルタ">
+      <div class="search-row">
+        <input id="searchInput" type="search" placeholder="カードID・名前で検索（例: E1-01 / PR）" aria-label="カード検索">
+      </div>
+
+      <div class="filter-block">
+        <span class="filter-label">弾</span>
+        <div id="seriesTabs" class="chip-row" role="group" aria-label="弾フィルタ"></div>
+      </div>
+
+      <div class="filter-block">
+        <span class="filter-label">レアリティ</span>
+        <div id="rarityChips" class="chip-row" role="group" aria-label="レアリティフィルタ">
+          <button type="button" class="chip-btn" data-rarity="all" aria-pressed="true">すべて</button>
+          <button type="button" class="chip-btn" data-rarity="PR" aria-pressed="true">PR</button>
+          <button type="button" class="chip-btn" data-rarity="R" aria-pressed="true">R</button>
+          <button type="button" class="chip-btn" data-rarity="N" aria-pressed="true">N</button>
+          <button type="button" class="chip-btn" data-rarity="ER" aria-pressed="true">ER</button>
+        </div>
+      </div>
+
+      <div class="filter-block">
+        <label class="switch-label" for="parallelToggle">
+          <input type="checkbox" id="parallelToggle">
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+          パラレルカードを表示
+        </label>
+      </div>
+
+      <div class="toolbar-meta">
+        <span id="resultCount">0</span> 件表示中
+      </div>
+    </section>
+
+    <section class="selection-bar glass-card" aria-label="選択状況と操作">
+      <div class="selection-summary">
+        <span class="summary-pill summary-want">求 <strong id="summaryWant">0</strong>種</span>
+        <span class="summary-pill summary-yield">譲 <strong id="summaryYield">0</strong>種</span>
+      </div>
+      <div class="selection-actions">
+        <button id="clearBtn" type="button" class="btn btn-ghost">選択をすべてクリア</button>
+        <button id="generateBtn" type="button" class="btn btn-primary">交換画像を作成</button>
+      </div>
+    </section>
+
+    <p id="html2canvasWarning" class="inline-warning" hidden>
+      画像生成にはネット接続が必要です（html2canvasの読み込みに失敗しました）。オンラインの状態で再読み込みしてください。
+    </p>
+
+    <section aria-label="カード一覧">
+      <div id="cardGrid" class="card-grid"></div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    カードデータ: <a href="https://min-poke.github.io/cardlist-aikatsu-encore/" target="_blank" rel="noopener noreferrer">アイカツ！アンコール カードリスト</a> より
+  </footer>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <!-- html2canvasでの書き出し用ステージ（画面外に配置。file://でも同一オリジン扱いのcanvasタイントを避けるためimgにcrossorigin="anonymous"を必須で付ける） -->
+  <div id="exportStage" class="export-stage" aria-hidden="true"></div>
+
+  <script src="cards.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
