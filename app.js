@@ -3,9 +3,17 @@
 
   var IMAGE_BASE = "https://min-poke.github.io/cardlist-aikatsu-encore/";
   var STORAGE_KEY = "aikatsu-trade-selections-v1";
+  var STORAGE_KEY_OWNED = "aikatsu-trade-owned-v1";
   var RARITIES = ["PR", "ER", "R", "N"];
   var RARITY_RANK = RARITIES.reduce(function (acc, r, i) { acc[r] = i; return acc; }, {});
   var MAX_QTY = 99;
+  var MAX_OWNED = 3;
+  var OWNED_OPTIONS = [
+    { value: 0, label: "0" },
+    { value: 1, label: "1" },
+    { value: 2, label: "2" },
+    { value: 3, label: "3+" }
+  ];
 
   var CARD_BY_ID = new Map(CARDS.map(function (c) { return [c.id, c]; }));
   var DISPLAY_ORDER = buildDisplayOrder(CARDS);
@@ -13,6 +21,7 @@
   var AVAILABLE_SERIES = getAvailableSeries(CARDS);
 
   var selections = loadSelections();
+  var owned = loadOwned();
   var filters = {
     series: "all",
     rarities: new Set(RARITIES),
@@ -128,6 +137,37 @@
     } catch (e) {
       console.warn("[aikatsu-trade] 選択状態の保存に失敗しました", e);
     }
+  }
+
+  function loadOwned() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY_OWNED);
+      if (!raw) return {};
+      var parsed = JSON.parse(raw);
+      return (parsed && typeof parsed === "object") ? parsed : {};
+    } catch (e) {
+      console.warn("[aikatsu-trade] 所持枚数の読み込みに失敗しました", e);
+      return {};
+    }
+  }
+
+  function saveOwned() {
+    try {
+      localStorage.setItem(STORAGE_KEY_OWNED, JSON.stringify(owned));
+    } catch (e) {
+      console.warn("[aikatsu-trade] 所持枚数の保存に失敗しました", e);
+    }
+  }
+
+  function getOwned(id) {
+    return owned.hasOwnProperty(id) ? owned[id] : 0;
+  }
+
+  function setOwned(id, value) {
+    owned[id] = Math.min(MAX_OWNED, Math.max(0, value));
+    saveOwned();
+    updateCardCellUI(id);
+    renderSummary();
   }
 
   // ---- フィルタ UI ----
@@ -282,10 +322,37 @@
     stepper.appendChild(qtyValue);
     stepper.appendChild(inc);
 
+    var ownedRow = document.createElement("div");
+    ownedRow.className = "owned-row";
+
+    var ownedLabel = document.createElement("span");
+    ownedLabel.className = "owned-label";
+    ownedLabel.textContent = "所持";
+
+    var ownedButtons = document.createElement("div");
+    ownedButtons.className = "owned-buttons";
+    ownedButtons.setAttribute("role", "group");
+    ownedButtons.setAttribute("aria-label", card.name + "（" + card.rarity + "）の所持枚数");
+
+    OWNED_OPTIONS.forEach(function (opt) {
+      var ownedBtn = document.createElement("button");
+      ownedBtn.type = "button";
+      ownedBtn.className = "owned-btn";
+      ownedBtn.dataset.owned = String(opt.value);
+      ownedBtn.setAttribute("aria-pressed", "false");
+      ownedBtn.setAttribute("aria-label", "所持枚数を" + opt.label + "にする");
+      ownedBtn.textContent = opt.label;
+      ownedButtons.appendChild(ownedBtn);
+    });
+
+    ownedRow.appendChild(ownedLabel);
+    ownedRow.appendChild(ownedButtons);
+
     cell.appendChild(imgWrap);
     cell.appendChild(label);
     cell.appendChild(statusRow);
     cell.appendChild(stepper);
+    cell.appendChild(ownedRow);
     return cell;
   }
 
@@ -321,6 +388,15 @@
       stepper.hidden = true;
       qtyPill.hidden = true;
     }
+
+    var ownedVal = getOwned(id);
+    var ownedBtns = cell.querySelectorAll(".owned-btn");
+    Array.prototype.forEach.call(ownedBtns, function (btn) {
+      var active = Number(btn.dataset.owned) === ownedVal;
+      btn.classList.toggle("is-active", active);
+      btn.setAttribute("aria-pressed", String(active));
+    });
+    cell.classList.toggle("is-unowned", ownedVal === 0);
   }
 
   // ---- 選択状態（求/譲ボタンの排他トグル） ----
@@ -396,6 +472,11 @@
       if (qtyBtn) {
         var cell = qtyBtn.closest(".card-cell");
         changeQty(cell.dataset.id, qtyBtn.dataset.action === "inc" ? 1 : -1);
+        return;
+      }
+      var ownedBtn = e.target.closest(".owned-btn");
+      if (ownedBtn) {
+        setOwned(ownedBtn.closest(".card-cell").dataset.id, Number(ownedBtn.dataset.owned));
         return;
       }
       var statusBtn = e.target.closest(".status-btn");
