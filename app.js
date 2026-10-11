@@ -362,18 +362,7 @@
     img.crossOrigin = "anonymous";
     imgWrap.appendChild(img);
 
-    var label = document.createElement("div");
-    label.className = "card-label";
-    if (card.parallel) {
-      var mark = document.createElement("span");
-      mark.className = "parallel-mark";
-      mark.textContent = "♦ ";
-      label.appendChild(mark);
-    }
-    label.appendChild(document.createTextNode(card.id));
-
     cell.appendChild(imgWrap);
-    cell.appendChild(label);
 
     if (mode === MODES.TRADE) {
       var badge = document.createElement("span");
@@ -828,11 +817,6 @@
       qtyPill.textContent = "×" + qty;
       tile.appendChild(qtyPill);
     }
-
-    var idLabel = document.createElement("div");
-    idLabel.className = "export-tile-id";
-    idLabel.textContent = card.id;
-    tile.appendChild(idLabel);
 
     return tile;
   }
