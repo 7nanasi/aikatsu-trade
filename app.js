@@ -328,6 +328,30 @@
   // 新しいコーデが始まり、ボトムス/シューズ/アクセサリーは直前のコーデに続く。
   var COORDE_START = { "トップス": 1, "トップス&ボトムス": 1, "フルコーデ": 1 };
 
+  function longestCommonPrefix(strs) {
+    if (!strs.length) return "";
+    var p = strs[0];
+    for (var i = 1; i < strs.length; i++) {
+      var s = strs[i];
+      var j = 0;
+      while (j < p.length && j < s.length && p[j] === s[j]) j++;
+      p = p.slice(0, j);
+      if (!p) break;
+    }
+    return p;
+  }
+
+  // コーデ名: 主要パーツ(アクセ以外)の衣装名の共通接頭辞（オーロラキネス 等）。
+  // 取れないときは先頭カードの名前をそのまま使う。
+  function coordeName(group) {
+    var mains = group.filter(function (c) { return c.type !== "アクセサリー"; })
+                     .map(function (c) { return c.dressName || ""; });
+    var names = mains.length ? mains : group.map(function (c) { return c.dressName || ""; });
+    if (names.length === 1) return names[0];
+    var p = longestCommonPrefix(names).replace(/[\s・･]+$/, "");
+    return p.length >= 2 ? p : names[0];
+  }
+
   function buildCoordeGroups(cards) {
     var groups = [];
     var cur = null;
@@ -355,6 +379,11 @@
 
       var block = document.createElement("div");
       block.className = "coorde-block";
+
+      var head = document.createElement("div");
+      head.className = "coorde-name";
+      head.textContent = coordeName(group);
+      block.appendChild(head);
 
       // 1本の折り返し行に全カードを入れる（非アクセ→アクセの順）。広い画面では
       // 横一列に収まり、狭い画面ではアクセサリーが次の行に折り返す。
@@ -402,11 +431,6 @@
     imgWrap.appendChild(img);
 
     cell.appendChild(imgWrap);
-
-    var nameEl = document.createElement("div");
-    nameEl.className = "card-name";
-    nameEl.textContent = card.dressName || card.id;
-    cell.appendChild(nameEl);
 
     if (mode === MODES.TRADE) {
       var badge = document.createElement("span");
