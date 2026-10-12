@@ -324,16 +324,60 @@
 
   // ---- カードグリッド ----
 
+  // コーデ（衣装セット）単位でまとめる。トップス/トップス&ボトムス/フルコーデで
+  // 新しいコーデが始まり、ボトムス/シューズ/アクセサリーは直前のコーデに続く。
+  var COORDE_START = { "トップス": 1, "トップス&ボトムス": 1, "フルコーデ": 1 };
+
+  function buildCoordeGroups(cards) {
+    var groups = [];
+    var cur = null;
+    cards.forEach(function (c) {
+      // パラレルは同じカードの別版なので新コーデを開始せず、直前のコーデに続ける
+      if (!cur || (COORDE_START[c.type] && !c.parallel)) {
+        cur = [];
+        groups.push(cur);
+      }
+      cur.push(c);
+    });
+    return groups;
+  }
+
   function renderGrid() {
     var filtered = getFilteredCards();
+    var visible = new Set(filtered.map(function (c) { return c.id; }));
+    var groups = buildCoordeGroups(DISPLAY_ORDER);
     var frag = document.createDocumentFragment();
-    filtered.forEach(function (card) {
-      frag.appendChild(buildCardCell(card));
+    var count = 0;
+
+    groups.forEach(function (group) {
+      var cards = group.filter(function (c) { return visible.has(c.id); });
+      if (cards.length === 0) return;
+
+      var block = document.createElement("div");
+      block.className = "coorde-block";
+
+      var mains = cards.filter(function (c) { return c.type !== "アクセサリー"; });
+      var accs = cards.filter(function (c) { return c.type === "アクセサリー"; });
+
+      if (mains.length) {
+        var mainRow = document.createElement("div");
+        mainRow.className = "coorde-row";
+        mains.forEach(function (c) { mainRow.appendChild(buildCardCell(c)); count++; });
+        block.appendChild(mainRow);
+      }
+      if (accs.length) {
+        var accRow = document.createElement("div");
+        accRow.className = "coorde-row coorde-acc";
+        accs.forEach(function (c) { accRow.appendChild(buildCardCell(c)); count++; });
+        block.appendChild(accRow);
+      }
+      frag.appendChild(block);
     });
+
     els.cardGrid.innerHTML = "";
     els.cardGrid.appendChild(frag);
-    filtered.forEach(function (card) { updateCardCellUI(card.id); });
-    els.resultCount.textContent = String(filtered.length);
+    filtered.forEach(function (card) { if (visible.has(card.id)) updateCardCellUI(card.id); });
+    els.resultCount.textContent = String(count);
   }
 
   function getStatusBadgeInfo(sel) {
@@ -363,6 +407,11 @@
     imgWrap.appendChild(img);
 
     cell.appendChild(imgWrap);
+
+    var nameEl = document.createElement("div");
+    nameEl.className = "card-name";
+    nameEl.textContent = card.dressName || card.id;
+    cell.appendChild(nameEl);
 
     if (mode === MODES.TRADE) {
       var badge = document.createElement("span");

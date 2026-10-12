@@ -385,21 +385,50 @@ body {
 
 .card-grid {
   display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.coorde-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.45rem;
+  background: rgba(255, 255, 255, 0.28);
+  border: 1px solid var(--glass-border);
+  border-radius: 1rem;
+}
+
+.coorde-row {
+  display: flex;
   flex-wrap: wrap;
-  align-content: flex-start;
-  gap: 0.7rem;
+  align-items: flex-start;
+  gap: 0.4rem;
 }
 
 .card-cell {
   width: fit-content;
   background: var(--glass-bg-lo);
   border: 1px solid var(--glass-border);
-  border-radius: 1.1rem;
-  padding: 0.35rem;
+  border-radius: 0.9rem;
+  padding: 0.3rem;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.3rem;
   transition: background 0.15s ease;
+}
+
+.card-name {
+  font-size: 0.6rem;
+  line-height: 1.25;
+  color: var(--ink-muted);
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
 }
 
 .card-cell.is-want {
@@ -430,7 +459,7 @@ body {
   border-radius: 0.8rem;
   overflow: hidden;
   line-height: 0;
-  height: 150px;
+  height: 132px;
   width: fit-content;
   margin: 0 auto;
 }
