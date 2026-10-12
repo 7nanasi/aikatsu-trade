@@ -356,21 +356,16 @@
       var block = document.createElement("div");
       block.className = "coorde-block";
 
+      // 1本の折り返し行に全カードを入れる（非アクセ→アクセの順）。広い画面では
+      // 横一列に収まり、狭い画面ではアクセサリーが次の行に折り返す。
       var mains = cards.filter(function (c) { return c.type !== "アクセサリー"; });
       var accs = cards.filter(function (c) { return c.type === "アクセサリー"; });
+      var ordered = mains.concat(accs);
 
-      if (mains.length) {
-        var mainRow = document.createElement("div");
-        mainRow.className = "coorde-row";
-        mains.forEach(function (c) { mainRow.appendChild(buildCardCell(c)); count++; });
-        block.appendChild(mainRow);
-      }
-      if (accs.length) {
-        var accRow = document.createElement("div");
-        accRow.className = "coorde-row coorde-acc";
-        accs.forEach(function (c) { accRow.appendChild(buildCardCell(c)); count++; });
-        block.appendChild(accRow);
-      }
+      var row = document.createElement("div");
+      row.className = "coorde-row";
+      ordered.forEach(function (c) { row.appendChild(buildCardCell(c)); count++; });
+      block.appendChild(row);
       frag.appendChild(block);
     });
 
